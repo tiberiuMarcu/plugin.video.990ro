@@ -1,3 +1,9 @@
+[B]Version 1.0.1[/B]
+
+- support for xvidstage links.
+- show movie title info when playing media
+- refactoring code
+
 [B]Version 1.0.0[/B]
 
-- First version. Next to do: pagination for movies
+- First version.
