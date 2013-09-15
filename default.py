@@ -1,8 +1,8 @@
-import urllib,urllib2,re,xbmc,xbmcplugin,xbmcaddon,xbmcgui,os,sys,commands,HTMLParser
+import urllib,urllib2,re,xbmc,xbmcplugin,xbmcaddon,xbmcgui,os,sys,commands,HTMLParser,jsunpack
 
 website = 'http://www.990.ro/';
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __plugin__ = "990.ro" + __version__
 __url__ = "www.xbmc.com"
 settings = xbmcaddon.Addon( id = 'plugin.video.990ro' )
@@ -90,16 +90,19 @@ def VIDEO_EPISOD(url):
     match=re.compile("seriale2-([0-9]+-[0-9]+)-(.+?)-download", re.IGNORECASE).findall(url)
     id_episod = match[0][0]
     nume = match[0][1]
+
+    # link fu
     legatura = 'http://www.990.ro/player-serial-'+id_episod+'-'+nume+'--sfast.html'
-    link = get_url(legatura)
-    match = re.compile('<center><center><a href=\'(.+?)\'><img src=\'.+?\'></a></center></center>', re.IGNORECASE).findall(link)
-    fu_link = match[0]
-    fu_source = get_url(fu_link)
-    # fastupload flv url
-    match=re.compile("'file': '(.+?).flv',", re.IGNORECASE).findall(fu_source)
-    url_flv = match[0] + '.flv'
-    # link catre video
-    addLink('Redare video', url_flv+'?.flv','')
+    # fu source
+    fu_source = get_fu_link(legatura)
+    addLink('Server FastUpload', fu_source['url']+'?.flv', '', fu_source['title'])
+
+    # link xvidstage
+    legatura = 'http://www.990.ro/player-serial-'+id_episod+'-'+nume+'--sxvid.html'
+    # xvidstage source - if it is alive
+    xv_source = get_xvidstage_link(legatura)
+    if xv_source['url'] != '' :
+        addLink('Server Xvidstage', xv_source['url']+'?.flv', '', xv_source['title'])
 
 def VIDEO(url, name):
     #print 'url video '+url
@@ -121,18 +124,21 @@ def VIDEO(url, name):
     # video id
     match=re.compile('990.ro/filme-([0-9]+)-.+?.html', re.IGNORECASE).findall(url)
     video_id = match[0]
+
+    # fu source
     source_link = 'http://www.990.ro/player-film-'+video_id+'-sfast.html'
-    link = get_url(source_link)
-    match = re.compile('<center><center><a href=\'(.+?)\'><img src=\'.+?\'></a></center></center>', re.IGNORECASE).findall(link)
-    fu_link = match[0]
-    fu_source = get_url(fu_link)
-    # fastupload flv url
-    match=re.compile("'file': '(.+?).flv',", re.IGNORECASE).findall(fu_source)
-    url_flv = match[0] + '.flv'
-    # link catre video
-    addLink('Redare video (calitatea filmului: nota '+calitate_film+')', url_flv+'?.flv',thumbnail)
+    fu_source = get_fu_link(source_link)
+    addLink('Server FastUpload (calitate video: nota '+calitate_film+')', fu_source['url']+'?.flv', thumbnail, fu_source['title'])
+
+    # xvidstage source
+    source_link = 'http://www.990.ro/player-film-'+video_id+'-sxvid.html'
+    xv_source = get_xvidstage_link(source_link)
+    if xv_source['url'] != '' :
+        addLink('Server Xvidstage (calitate video: nota '+calitate_film+')', xv_source['url']+'?.flv', thumbnail, xv_source['title'])
+
+    # link trailer
     if link_video_trailer != '':
-        addLink('Trailer film', link_video_trailer+'?.mp4', thumbnail)
+        addLink('Trailer film', link_video_trailer+'?.mp4', thumbnail, fu_source['title']+' (trailer)')
     
 
 def get_url(url):
@@ -142,6 +148,47 @@ def get_url(url):
     link=response.read()
     response.close()
     return link
+
+def get_fu_link(legatura):
+    link = get_url(legatura)
+    match = re.compile('<center><center><a href=\'(.+?)\'><img src=\'.+?\'></a></center></center>', re.IGNORECASE).findall(link)
+    fu_link = match[0]
+    fu_source = get_url(fu_link)
+    # titlu serial episod
+    match=re.compile("<div class=\'post_title\'><center><h1>(.+?)</h1></center></div>", re.IGNORECASE).findall(link)
+    episode_title = match[0]
+    # fastupload flv url
+    match=re.compile("'file': '(.+?).flv',", re.IGNORECASE).findall(fu_source)
+    url_flv = match[0] + '.flv'
+    #prepare
+    fu = {}
+    fu['title'] = episode_title
+    fu['url'] = url_flv
+    return fu
+
+def get_xvidstage_link(legatura):
+    link = get_url(legatura)
+    match = re.compile('<center><IFRAME SRC="(.+?)" FRAMEBORDER=0', re.IGNORECASE).findall(link)
+    xv_link = match[0]
+    # titlu serial episod
+    match=re.compile("<div class=\'post_title\'><center><h1>(.+?)</h1></center></div>", re.IGNORECASE).findall(link)
+    movie_title = match[0]
+    # xvidstage flv url
+    xv_source = get_url(xv_link)
+    match=re.compile("src='http://xvidstage.com/player/swfobject.js'></script>.+?<script type=\'text/javascript\'>(.*?)</script>", re.DOTALL + re.IGNORECASE).findall(xv_source)
+    if(match):
+        sJavascript = match[0]
+        string = jsunpack.unpack(sJavascript)
+        string = string.replace("\\", "")
+        match = re.compile("'file','(.+?)'", re.DOTALL + re.IGNORECASE).findall(string)
+        xvidstage_flv = match[0]
+    else:
+        xvidstage_flv = ''
+    #prepare
+    xv = {}
+    xv['title'] = movie_title
+    xv['url'] = xvidstage_flv
+    return xv
 
 def get_params():
         param=[]
@@ -193,10 +240,10 @@ def youtube_video_link(url):
     return link
 
 
-def addLink(name,url,iconimage):
+def addLink(name,url,iconimage,movie_name):
         ok=True
         liz=xbmcgui.ListItem(name, iconImage="DefaultVideo.png", thumbnailImage=iconimage)
-        liz.setInfo( type="Video", infoLabels={ "Title": name } )
+        liz.setInfo( type="Video", infoLabels={ "Title": movie_name } )
         ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=url,listitem=liz)
         return ok
 
