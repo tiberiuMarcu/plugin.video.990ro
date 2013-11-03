@@ -2,7 +2,7 @@ import urllib,urllib2,re,xbmc,xbmcplugin,xbmcaddon,xbmcgui,os,sys,commands,HTMLP
 
 website = 'http://www.990.ro/';
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 __plugin__ = "990.ro" + __version__
 __url__ = "www.xbmc.com"
 settings = xbmcaddon.Addon( id = 'plugin.video.990ro' )
@@ -95,7 +95,7 @@ def VIDEO_EPISOD(url):
     legatura = 'http://www.990.ro/player-serial-'+id_episod+'-'+nume+'--sfast.html'
     # fu source
     fu_source = get_fu_link(legatura)
-    addLink('Server FastUpload', fu_source['url']+'?.flv', '', fu_source['title'])
+    addLink('Server FastUpload', fu_source['url']+'?.flv|referer='+fu_source['referer'], '', fu_source['title'])
 
     # link xvidstage
     legatura = 'http://www.990.ro/player-serial-'+id_episod+'-'+nume+'--sxvid.html'
@@ -116,8 +116,8 @@ def VIDEO(url, name):
     calitate_film = match[0]
     #link trailer
     try:
-        match=re.compile("'file': '(.+?)',", re.IGNORECASE).findall(src)
-        link_youtube = match[0]
+        match=re.compile("<div align='center'><iframe width='595' height='335' src='.+?/embed/(.+?)'", re.IGNORECASE).findall(src)
+        link_youtube = 'http://www.youtube.com/watch?v='+match[0]
         link_video_trailer = youtube_video_link(link_youtube)
     except:
         link_video_trailer = ''
@@ -128,7 +128,8 @@ def VIDEO(url, name):
     # fu source
     source_link = 'http://www.990.ro/player-film-'+video_id+'-sfast.html'
     fu_source = get_fu_link(source_link)
-    addLink('Server FastUpload (calitate video: nota '+calitate_film+')', fu_source['url']+'?.flv', thumbnail, fu_source['title'])
+    if fu_source['url'] != '':
+        addLink('Server FastUpload (calitate video: nota '+calitate_film+')', fu_source['url']+'?.flv|referer='+fu_source['referer'], thumbnail, fu_source['title'])
 
     # xvidstage source
     source_link = 'http://www.990.ro/player-film-'+video_id+'-sxvid.html'
@@ -144,16 +145,21 @@ def VIDEO(url, name):
 def get_url(url):
     req = urllib2.Request(url)
     req.add_header('User-Agent', 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-GB; rv:1.9.0.3) Gecko/2008092417 Firefox/3.0.3')
-    response = urllib2.urlopen(req)
-    link=response.read()
-    response.close()
-    return link
+    try:
+        response = urllib2.urlopen(req)
+        link=response.read()
+        response.close()
+        return link
+    except:
+        return False
 
 def get_fu_link(legatura):
     link = get_url(legatura)
     match = re.compile('<center><center><a href=\'(.+?)\'><img src=\'.+?\'></a></center></center>', re.IGNORECASE).findall(link)
     fu_link = match[0]
     fu_source = get_url(fu_link)
+    if fu_source == False:
+        return {'title': '', 'url': ''}
     # titlu serial episod
     match=re.compile("<div class=\'post_title\'><center><h1>(.+?)</h1></center></div>", re.IGNORECASE).findall(link)
     episode_title = match[0]
@@ -162,8 +168,9 @@ def get_fu_link(legatura):
     url_flv = match[0] + '.flv'
     #prepare
     fu = {}
-    fu['title'] = episode_title
-    fu['url'] = url_flv
+    fu['title']   = episode_title
+    fu['url']     = url_flv
+    fu['referer'] = fu_link 
     return fu
 
 def get_xvidstage_link(legatura):
@@ -175,6 +182,8 @@ def get_xvidstage_link(legatura):
     movie_title = match[0]
     # xvidstage flv url
     xv_source = get_url(xv_link)
+    if xv_source == False:
+        return {'title': '', 'url': ''}
     match=re.compile("src='http://xvidstage.com/player/swfobject.js'></script>.+?<script type=\'text/javascript\'>(.*?)</script>", re.DOTALL + re.IGNORECASE).findall(xv_source)
     if(match):
         sJavascript = match[0]

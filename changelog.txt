@@ -1,3 +1,9 @@
+[B]Version 1.0.2[/B]
+
+- add referer header to fastupload links 
+- fix for missing xvidstage or fastupload links
+- fix for youtube trailer
+
 [B]Version 1.0.1[/B]
 
 - support for xvidstage links.
